@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_core/firebase_core.dart'; // ⬅️ IMPORTANTE
+import 'package:firebase_core/firebase_core.dart';
 
+import 'firebase_options.dart';
 import 'theme/tema_bender.dart';
 import 'vista_modelos/navigation_viewmodel.dart';
 import 'vista_modelos/propiedades_vm.dart';
@@ -10,8 +11,11 @@ import 'vista_modelos/finanzas_vm.dart';
 import 'vistas/inicio_vista.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();   // ⬅️ Necesario antes de inicializar Firebase
-  await Firebase.initializeApp();              // ⬅️ Inicializa Firebase
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
   runApp(const MyApp());
 }

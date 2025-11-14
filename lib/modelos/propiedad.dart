@@ -15,12 +15,24 @@ class Propiedad {
 
   // Para leer desde Firestore
   factory Propiedad.fromMap(String id, Map<String, dynamic> data) {
+    // Conversión segura de número a double
+    double alquiler = 0.0;
+    final alquilerData = data['alquilerMensual'];
+
+    if (alquilerData is int) {
+      alquiler = alquilerData.toDouble();
+    } else if (alquilerData is double) {
+      alquiler = alquilerData;
+    } else if (alquilerData is String) {
+      alquiler = double.tryParse(alquilerData) ?? 0.0;
+    }
+
     return Propiedad(
       id: id,
-      titulo: data['titulo'] ?? '',
-      direccion: data['direccion'] ?? '',
-      alquilerMensual: (data['alquilerMensual'] ?? 0).toDouble(),
-      imagen: data['imagen'] ?? '',
+      titulo: data['titulo']?.toString() ?? 'Sin título',
+      direccion: data['direccion']?.toString() ?? 'Sin dirección',
+      alquilerMensual: alquiler,
+      imagen: data['imagen']?.toString() ?? '',
     );
   }
 
