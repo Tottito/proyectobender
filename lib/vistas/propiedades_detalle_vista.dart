@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:probando_app_bender_v0/servicios/storage_servicio.dart';
 import 'package:provider/provider.dart';
 import '../modelos/propiedad.dart';
 import '../vista_modelos/propiedades_vm.dart';
+import '../servicios/storage_servicio.dart';
 import 'agregar_propiedad_vista.dart';
 
 class PropiedadDetalleVista extends StatelessWidget {
@@ -17,28 +17,48 @@ class PropiedadDetalleVista extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Detalle de Propiedad'),
         backgroundColor: Theme.of(context).colorScheme.surface,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
+        actions: [
+          // Botón de menú con opciones
+          PopupMenuButton(
+            icon: const Icon(Icons.more_vert),
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'editar',
+                child: Row(
+                  children: [
+                    Icon(Icons.edit, color: Colors.amber),
+                    SizedBox(width: 8),
+                    Text('Editar'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'eliminar',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete, color: Colors.red),
+                    SizedBox(width: 8),
+                    Text('Eliminar'),
+                  ],
+                ),
+              ),
+            ],
+            onSelected: (value) {
+              if (value == 'editar') {
+                _editarPropiedad(context);
+              } else if (value == 'eliminar') {
+                _mostrarDialogoEliminar(context);
+              }
+            },
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Imagen o placeholder
-            if (propiedad.imagen.isNotEmpty)
-              Image.network(
-                propiedad.imagen,
-                width: double.infinity,
-                height: 250,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return _buildImagenPlaceholder();
-                },
-              )
-            else
-              _buildImagenPlaceholder(),
+            // Imagen
+            _buildImagen(),
 
             // Contenido
             Padding(
@@ -60,19 +80,12 @@ class PropiedadDetalleVista extends StatelessWidget {
                   // Dirección
                   Row(
                     children: [
-                      const Icon(
-                        Icons.location_on,
-                        color: Colors.amber,
-                        size: 20,
-                      ),
+                      const Icon(Icons.location_on, color: Colors.amber, size: 20),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           propiedad.direccion,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 16,
-                          ),
+                          style: const TextStyle(color: Colors.white70, fontSize: 16),
                         ),
                       ),
                     ],
@@ -89,25 +102,16 @@ class PropiedadDetalleVista extends StatelessWidget {
                           Colors.amber.withOpacity(0.2),
                           Colors.amber.withOpacity(0.05),
                         ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
                       ),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: Colors.amber.withOpacity(0.3),
-                        width: 1.5,
-                      ),
+                      border: Border.all(color: Colors.amber.withOpacity(0.3), width: 1.5),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
                           'Alquiler Mensual',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
+                          style: TextStyle(color: Colors.white70, fontSize: 14),
                         ),
                         const SizedBox(height: 8),
                         Text(
@@ -123,7 +127,7 @@ class PropiedadDetalleVista extends StatelessWidget {
                   ),
                   const SizedBox(height: 24),
 
-                  // Estado de la propiedad
+                  // Estado
                   const Text(
                     'Estado',
                     style: TextStyle(
@@ -133,20 +137,11 @@ class PropiedadDetalleVista extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 12),
-
-                  Row(
+                  Wrap(
+                    spacing: 12,
                     children: [
-                      _buildEstadoChip(
-                        'Disponible',
-                        Colors.green,
-                        Icons.check_circle,
-                      ),
-                      const SizedBox(width: 12),
-                      _buildEstadoChip(
-                        'Sin inquilino',
-                        Colors.blue,
-                        Icons.person_off,
-                      ),
+                      _buildEstadoChip('Disponible', Colors.green, Icons.check_circle),
+                      _buildEstadoChip('Sin inquilino', Colors.blue, Icons.person_off),
                     ],
                   ),
                   const SizedBox(height: 24),
@@ -154,81 +149,43 @@ class PropiedadDetalleVista extends StatelessWidget {
                   // Información adicional
                   const Text(
                     'Información',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 16),
-
-                  _buildInfoItem(
-                    Icons.calendar_today,
-                    'Fecha de registro',
-                    'Noviembre 2024',
-                    Colors.purple,
-                  ),
+                  _buildInfoItem(Icons.calendar_today, 'Fecha de registro', 'Noviembre 2024', Colors.purple),
                   const SizedBox(height: 12),
-                  _buildInfoItem(
-                    Icons.payment,
-                    'Último pago',
-                    'Pendiente',
-                    Colors.orange,
-                  ),
+                  _buildInfoItem(Icons.payment, 'Último pago', 'Pendiente', Colors.orange),
                   const SizedBox(height: 12),
-                  _buildInfoItem(
-                    Icons.door_front_door,
-                    'Tipo',
-                    'Departamento',
-                    Colors.cyan,
-                  ),
+                  _buildInfoItem(Icons.door_front_door, 'Tipo', 'Departamento', Colors.cyan),
                   const SizedBox(height: 32),
 
-                  // Botones de acción para Bender
+                  // Botones de acción
                   Row(
                     children: [
                       Expanded(
                         child: ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => AgregarPropiedadVista(
-                                  propiedad: propiedad,
-                                ),
-                              ),
-                            ).then((_) {
-                              // Volver a la lista después de editar
-                              Navigator.pop(context);
-                            });
-                          },
+                          onPressed: () => _editarPropiedad(context),
                           icon: const Icon(Icons.edit),
                           label: const Text('Editar'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.amber,
                             foregroundColor: Colors.black,
                             padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: () {
-                            _mostrarDialogoEliminar(context);
-                          },
+                          onPressed: () => _mostrarDialogoEliminar(context),
                           icon: const Icon(Icons.delete),
                           label: const Text('Eliminar'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: Colors.red,
                             side: const BorderSide(color: Colors.red),
                             padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                         ),
                       ),
@@ -243,37 +200,49 @@ class PropiedadDetalleVista extends StatelessWidget {
     );
   }
 
+  Widget _buildImagen() {
+    if (propiedad.imagen.isNotEmpty) {
+      return Image.network(
+        propiedad.imagen,
+        width: double.infinity,
+        height: 250,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => _buildImagenPlaceholder(),
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return SizedBox(
+            height: 250,
+            child: Center(
+              child: CircularProgressIndicator(
+                value: loadingProgress.expectedTotalBytes != null
+                    ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                    : null,
+                color: Colors.amber,
+              ),
+            ),
+          );
+        },
+      );
+    }
+    return _buildImagenPlaceholder();
+  }
+
   Widget _buildImagenPlaceholder() {
     return Container(
       width: double.infinity,
       height: 250,
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.grey[900]!,
-            Colors.grey[800]!,
-          ],
+          colors: [Colors.grey[900]!, Colors.grey[800]!],
         ),
       ),
       child: const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.home_work,
-              size: 64,
-              color: Colors.white24,
-            ),
+            Icon(Icons.home_work, size: 64, color: Colors.white24),
             SizedBox(height: 12),
-            Text(
-              'Sin imagen disponible',
-              style: TextStyle(
-                color: Colors.white38,
-                fontSize: 14,
-              ),
-            ),
+            Text('Sin imagen disponible', style: TextStyle(color: Colors.white38, fontSize: 14)),
           ],
         ),
       ),
@@ -286,42 +255,26 @@ class PropiedadDetalleVista extends StatelessWidget {
       decoration: BoxDecoration(
         color: color.withOpacity(0.15),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: color.withOpacity(0.3),
-        ),
+        border: Border.all(color: color.withOpacity(0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icono, size: 16, color: color),
           const SizedBox(width: 6),
-          Text(
-            texto,
-            style: TextStyle(
-              color: color,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+          Text(texto, style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w600)),
         ],
       ),
     );
   }
 
-  Widget _buildInfoItem(
-      IconData icono,
-      String titulo,
-      String valor,
-      Color color,
-      ) {
+  Widget _buildInfoItem(IconData icono, String titulo, String valor, Color color) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.1),
-        ),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
       ),
       child: Row(
         children: [
@@ -331,33 +284,16 @@ class PropiedadDetalleVista extends StatelessWidget {
               color: color.withOpacity(0.15),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(
-              icono,
-              color: color,
-              size: 22,
-            ),
+            child: Icon(icono, color: color, size: 22),
           ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  titulo,
-                  style: const TextStyle(
-                    color: Colors.white54,
-                    fontSize: 12,
-                  ),
-                ),
+                Text(titulo, style: const TextStyle(color: Colors.white54, fontSize: 12)),
                 const SizedBox(height: 4),
-                Text(
-                  valor,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
+                Text(valor, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500)),
               ],
             ),
           ),
@@ -366,72 +302,54 @@ class PropiedadDetalleVista extends StatelessWidget {
     );
   }
 
+  void _editarPropiedad(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AgregarPropiedadVista(propiedad: propiedad),
+      ),
+    ).then((_) {
+      // Volver a la lista después de editar
+      Navigator.pop(context);
+    });
+  }
+
   void _mostrarDialogoEliminar(BuildContext context) {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: const Color(0xFF1E1E1E),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: const Text(
-          '¿Eliminar propiedad?',
-          style: TextStyle(color: Colors.white),
-        ),
-        content: const Text(
-          'Esta acción no se puede deshacer. También se eliminará la imagen asociada.',
-          style: TextStyle(color: Colors.white70),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('¿Eliminar propiedad?', style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Esta acción no se puede deshacer.',
+              style: TextStyle(color: Colors.white70),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '• ${propiedad.titulo}',
+              style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '• ${propiedad.direccion}',
+              style: const TextStyle(color: Colors.white60),
+            ),
+          ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancelar'),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.white70)),
           ),
           TextButton(
             onPressed: () async {
               Navigator.pop(dialogContext); // Cierra diálogo
-
-              // Muestra loading
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (context) => const Center(
-                  child: CircularProgressIndicator(color: Colors.amber),
-                ),
-              );
-
-              try {
-                final vm = Provider.of<PropiedadesViewModel>(context, listen: false);
-
-                // Elimina imagen si existe
-                if (propiedad.imagen.isNotEmpty) {
-                  await StorageServicio().eliminarImagen(propiedad.imagen);
-                }
-
-                // Elimina de Firestore
-                await vm.eliminar(propiedad.id);
-
-                if (context.mounted) {
-                  Navigator.pop(context); // Cierra loading
-                  Navigator.pop(context); // Vuelve a lista
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Propiedad eliminada'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  Navigator.pop(context); // Cierra loading
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Error al eliminar: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
+              await _eliminarPropiedad(context);
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Eliminar'),
@@ -439,5 +357,49 @@ class PropiedadDetalleVista extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _eliminarPropiedad(BuildContext context) async {
+    // Muestra loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(color: Colors.amber),
+      ),
+    );
+
+    try {
+      final vm = Provider.of<PropiedadesViewModel>(context, listen: false);
+
+      // Elimina imagen si existe (de Firebase Storage)
+      if (propiedad.imagen.isNotEmpty && propiedad.imagen.contains('firebase')) {
+        await StorageServicio().eliminarImagen(propiedad.imagen);
+      }
+
+      // Elimina de Firestore
+      await vm.eliminar(propiedad.id);
+
+      if (context.mounted) {
+        Navigator.pop(context); // Cierra loading
+        Navigator.pop(context); // Vuelve a lista
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Propiedad eliminada correctamente'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.pop(context); // Cierra loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Error al eliminar: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }

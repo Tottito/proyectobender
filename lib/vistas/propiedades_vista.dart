@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:probando_app_bender_v0/vistas/propiedades_detalle_vista.dart';
 import 'package:provider/provider.dart';
 import '../vista_modelos/propiedades_vm.dart';
 import '../widgets/tarjeta_propiedad.dart';
@@ -15,7 +14,7 @@ class PropiedadesVista extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Propiedades'),
+        title: Text('Propiedades (${vm.propiedades.length})'),
         automaticallyImplyLeading: false,
         backgroundColor: Theme.of(context).colorScheme.surface,
         actions: [
@@ -23,6 +22,12 @@ class PropiedadesVista extends StatelessWidget {
             icon: const Icon(Icons.refresh),
             onPressed: () {
               vm.escucharPropiedades();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('🔄 Recargando propiedades...'),
+                  duration: Duration(seconds: 1),
+                ),
+              );
             },
           ),
         ],
@@ -140,7 +145,6 @@ class PropiedadesVista extends StatelessWidget {
           );
         },
       ),
-      // 👇👇👇 AQUÍ ESTÁ EL BOTÓN FLOTANTE 👇👇👇
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           Navigator.push(

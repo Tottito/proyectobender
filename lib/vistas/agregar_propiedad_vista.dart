@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import '../modelos/propiedad.dart';
 import '../vista_modelos/propiedades_vm.dart';
+import '../servicios/storage_servicio.dart';
 
 class AgregarPropiedadVista extends StatefulWidget {
   final Propiedad? propiedad;
@@ -19,7 +22,10 @@ class _AgregarPropiedadVistaState extends State<AgregarPropiedadVista> {
   final _alquilerController = TextEditingController();
   final _imagenUrlController = TextEditingController();
 
+  final ImagePicker _picker = ImagePicker();
+  File? _imagenSeleccionada;
   bool _guardando = false;
+  bool _subiendoImagen = false;
 
   @override
   void initState() {
@@ -41,6 +47,66 @@ class _AgregarPropiedadVistaState extends State<AgregarPropiedadVista> {
     super.dispose();
   }
 
+  Future<void> _seleccionarImagen() async {
+    try {
+      final XFile? imagen = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
+
+      if (imagen != null) {
+        setState(() {
+          _imagenSeleccionada = File(imagen.path);
+          _imagenUrlController.clear(); // Limpiar URL si se selecciona archivo
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al seleccionar imagen: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<String?> _subirImagenSiEsNecesario() async {
+    // Si hay imagen seleccionada del dispositivo, subirla
+    if (_imagenSeleccionada != null) {
+      setState(() => _subiendoImagen = true);
+
+      final storageService = StorageServicio();
+
+      // Si estamos editando y había una imagen anterior, eliminarla
+      if (widget.propiedad != null && widget.propiedad!.imagen.isNotEmpty) {
+        await storageService.eliminarImagen(widget.propiedad!.imagen);
+      }
+
+      // Subir nueva imagen
+      final url = await storageService.subirImagen(_imagenSeleccionada!, 'propiedades');
+
+      setState(() => _subiendoImagen = false);
+      return url;
+    }
+
+    // Si hay URL escrita, usarla
+    if (_imagenUrlController.text.trim().isNotEmpty) {
+      return _imagenUrlController.text.trim();
+    }
+
+    // Si estamos editando, mantener la imagen anterior
+    if (widget.propiedad != null) {
+      return widget.propiedad!.imagen;
+    }
+
+    // Sin imagen
+    return '';
+  }
+
   Future<void> _guardarPropiedad() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -49,17 +115,22 @@ class _AgregarPropiedadVistaState extends State<AgregarPropiedadVista> {
     try {
       final vm = Provider.of<PropiedadesViewModel>(context, listen: false);
 
+      // Subir imagen si es necesario
+      final imagenUrl = await _subirImagenSiEsNecesario();
+
       final propiedad = Propiedad(
         id: widget.propiedad?.id ?? '',
         titulo: _tituloController.text.trim(),
         direccion: _direccionController.text.trim(),
         alquilerMensual: double.parse(_alquilerController.text.trim()),
-        imagen: _imagenUrlController.text.trim(),
+        imagen: imagenUrl ?? '',
       );
 
       if (widget.propiedad == null) {
+        // AGREGAR nueva propiedad
         await vm.agregar(propiedad);
       } else {
+        // ACTUALIZAR propiedad existente
         await vm.actualizar(widget.propiedad!.id, propiedad);
       }
 
@@ -68,8 +139,8 @@ class _AgregarPropiedadVistaState extends State<AgregarPropiedadVista> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(widget.propiedad == null
-                ? 'Propiedad agregada correctamente'
-                : 'Propiedad actualizada correctamente'),
+                ? '✅ Propiedad agregada correctamente'
+                : '✅ Propiedad actualizada correctamente'),
             backgroundColor: Colors.green,
           ),
         );
@@ -78,7 +149,7 @@ class _AgregarPropiedadVistaState extends State<AgregarPropiedadVista> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al guardar: $e'),
+            content: Text('❌ Error al guardar: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -108,172 +179,79 @@ class _AgregarPropiedadVistaState extends State<AgregarPropiedadVista> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Vista previa de imagen
-              if (_imagenUrlController.text.isNotEmpty)
-                Container(
-                  width: double.infinity,
-                  height: 200,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    color: Colors.grey[800],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.network(
-                      _imagenUrlController.text,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return const Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.broken_image,
-                                size: 64,
-                                color: Colors.white38,
-                              ),
-                              SizedBox(height: 8),
-                              Text(
-                                'URL de imagen inválida',
-                                style: TextStyle(color: Colors.white38),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return const Center(
-                          child: CircularProgressIndicator(color: Colors.amber),
-                        );
-                      },
+              _buildVistaPrevia(),
+              const SizedBox(height: 16),
+
+              // Botones para seleccionar imagen
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _guardando ? null : _seleccionarImagen,
+                      icon: const Icon(Icons.photo_library),
+                      label: const Text('Galería'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.amber,
+                        side: const BorderSide(color: Colors.amber),
+                      ),
                     ),
                   ),
-                ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _guardando ? null : () {
+                        setState(() => _imagenSeleccionada = null);
+                      },
+                      icon: const Icon(Icons.clear),
+                      label: const Text('Limpiar'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white54,
+                        side: BorderSide(color: Colors.grey[700]!),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
 
-              // URL de imagen
+              // URL de imagen (alternativa)
               const Text(
-                'URL de Imagen',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+                'O pega una URL de imagen',
+                style: TextStyle(color: Colors.white70, fontSize: 12),
               ),
               const SizedBox(height: 8),
               TextFormField(
                 controller: _imagenUrlController,
                 style: const TextStyle(color: Colors.white),
-                onChanged: (value) {
-                  setState(() {}); // Actualiza vista previa
-                },
+                enabled: _imagenSeleccionada == null,
                 decoration: InputDecoration(
                   hintText: 'https://ejemplo.com/imagen.jpg',
                   hintStyle: TextStyle(color: Colors.grey[600]),
-                  helperText: 'Opcional: Pega el link de una imagen',
-                  helperStyle: const TextStyle(color: Colors.white54, fontSize: 12),
                   filled: true,
                   fillColor: Colors.white.withOpacity(0.05),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide(color: Colors.grey[700]!),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey[700]!),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Colors.amber, width: 2),
-                  ),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.clear, color: Colors.white54),
-                    onPressed: () {
-                      _imagenUrlController.clear();
-                      setState(() {});
-                    },
                   ),
                 ),
               ),
               const SizedBox(height: 24),
 
               // Título
-              const Text(
+              _buildCampoTexto(
                 'Título',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _tituloController,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  hintText: 'Ej: Depto Fry',
-                  hintStyle: TextStyle(color: Colors.grey[600]),
-                  filled: true,
-                  fillColor: Colors.white.withOpacity(0.05),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey[700]!),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey[700]!),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Colors.amber, width: 2),
-                  ),
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'El título es obligatorio';
-                  }
-                  return null;
-                },
+                _tituloController,
+                'Ej: Depto Fry',
+                Icons.title,
               ),
               const SizedBox(height: 20),
 
               // Dirección
-              const Text(
+              _buildCampoTexto(
                 'Dirección',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _direccionController,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  hintText: 'Ej: Calle Futuro 101',
-                  hintStyle: TextStyle(color: Colors.grey[600]),
-                  filled: true,
-                  fillColor: Colors.white.withOpacity(0.05),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey[700]!),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey[700]!),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Colors.amber, width: 2),
-                  ),
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'La dirección es obligatoria';
-                  }
-                  return null;
-                },
+                _direccionController,
+                'Ej: Calle Futuro 101',
+                Icons.location_on,
               ),
               const SizedBox(height: 20),
 
@@ -300,11 +278,6 @@ class _AgregarPropiedadVistaState extends State<AgregarPropiedadVista> {
                   fillColor: Colors.white.withOpacity(0.05),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey[700]!),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey[700]!),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -328,8 +301,8 @@ class _AgregarPropiedadVistaState extends State<AgregarPropiedadVista> {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton.icon(
-                  onPressed: _guardando ? null : _guardarPropiedad,
-                  icon: _guardando
+                  onPressed: (_guardando || _subiendoImagen) ? null : _guardarPropiedad,
+                  icon: (_guardando || _subiendoImagen)
                       ? const SizedBox(
                     width: 20,
                     height: 20,
@@ -339,7 +312,13 @@ class _AgregarPropiedadVistaState extends State<AgregarPropiedadVista> {
                     ),
                   )
                       : const Icon(Icons.save),
-                  label: Text(_guardando ? 'Guardando...' : 'Guardar Propiedad'),
+                  label: Text(
+                    _subiendoImagen
+                        ? 'Subiendo imagen...'
+                        : _guardando
+                        ? 'Guardando...'
+                        : 'Guardar Propiedad',
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.amber,
                     foregroundColor: Colors.black,
@@ -353,6 +332,105 @@ class _AgregarPropiedadVistaState extends State<AgregarPropiedadVista> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildVistaPrevia() {
+    Widget contenido;
+
+    if (_imagenSeleccionada != null) {
+      // Imagen del dispositivo
+      contenido = Image.file(
+        _imagenSeleccionada!,
+        fit: BoxFit.cover,
+      );
+    } else if (_imagenUrlController.text.isNotEmpty) {
+      // Imagen de URL
+      contenido = Image.network(
+        _imagenUrlController.text,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.broken_image, size: 64, color: Colors.white38),
+                SizedBox(height: 8),
+                Text('URL inválida', style: TextStyle(color: Colors.white38)),
+              ],
+            ),
+          );
+        },
+      );
+    } else {
+      // Sin imagen
+      contenido = const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.image, size: 64, color: Colors.white38),
+            SizedBox(height: 8),
+            Text('Sin imagen', style: TextStyle(color: Colors.white38)),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      height: 200,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: Colors.grey[800],
+      ),
+      clipBehavior: Clip.hardEdge,
+      child: contenido,
+    );
+  }
+
+  Widget _buildCampoTexto(
+      String label,
+      TextEditingController controller,
+      String hint,
+      IconData icono,
+      ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: TextStyle(color: Colors.grey[600]),
+            prefixIcon: Icon(icono, color: Colors.amber),
+            filled: true,
+            fillColor: Colors.white.withOpacity(0.05),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Colors.amber, width: 2),
+            ),
+          ),
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) {
+              return '$label es obligatorio';
+            }
+            return null;
+          },
+        ),
+      ],
     );
   }
 }
